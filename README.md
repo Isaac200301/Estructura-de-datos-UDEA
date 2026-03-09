@@ -26,3 +26,13 @@ erDiagram
 
     SALA ||--o{ EMPLEADO : "trabaja en"
     SALA ||--o{ PACIENTE : "está internado en"
+
+## 2. Diccionario de Datos
+
+| Entidad | Atributo | Tipo | Descripción |
+| :--- | :--- | :--- | :--- |
+| **SALA** | nombre_sala | PK (#) | Nombre único que identifica la sala. |
+| | cantidad_camas | Mandatory (*) | Capacidad total de la sala. |
+| **EMPLEADO** | numero_empleado | PK (#) | Código único de trabajador. |
+| | nombre, dirección, tel | Mandatory (*) | Datos de contacto y personales. |
+| **PACIENTE** | numero_registro | PK (#) | ID generado al ingreso del paciente. |
