@@ -27,6 +27,7 @@ erDiagram
     SALA ||--o{ EMPLEADO : "trabaja en"
     SALA ||--o{ PACIENTE : "está internado en"
 
+```
 ## 2. Diccionario de Datos
 
 | Entidad | Atributo | Tipo | Descripción |
