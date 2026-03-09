@@ -1,11 +1,9 @@
 # Estructura-de-datos-UDEA
-# Ejercicio: Modelo Entidad-Relación Hospital
+# Ejercicio: Modelo Entidad-Relación 
 
-Este repositorio contiene la resolución del ejercicio de modelado de datos para un sistema hospitalario, utilizando la **Notación de Barker**.
+Este repositorio contiene la solución del ejercicio de modelado de datos para un sistema hospitalario, utilizando la **Notación de Barker**.
 
 ## 1. Diagrama Entidad-Relación
-
-A continuación se presenta el modelo conceptual:
 
 ```mermaid
 erDiagram
