@@ -15,7 +15,6 @@ Implementar desde cero un **Árbol KD** (K-Dimensional Tree) para resolver de fo
 
 El proyecto compara la implementación del KD-Tree contra la **fuerza bruta** (recorrer todos los puntos) para medir empíricamente las diferencias de rendimiento y determinar a partir de qué tamaño de datos el KD-Tree comienza a ser más rápido.
 
-> **Restricción importante:** No se usaron librerías externas de árboles (como `scipy.spatial.KDTree`). Todo el árbol fue implementado manualmente.
 
 ---
 
