@@ -41,3 +41,4 @@ El Quadtree funciona así:
 3. Cada cuadrante puede dividirse otra vez si se llena
 
 ---
+<img width="1440" height="2840" alt="image" src="https://github.com/user-attachments/assets/8d80445e-91de-4acf-8d4e-58eb016c4c6b" />
