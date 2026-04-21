@@ -1,0 +1,8 @@
+# Dependencias del proyecto: Sistema de Logística con Quadtree
+# Instalar con: pip install -r requirements.txt
+
+osmnx>=1.9.0         # Descarga datos reales de OpenStreetMap
+pyproj>=3.6.0        # Proyección de coordenadas (lat/lon → metros)
+matplotlib>=3.8.0    # Visualizaciones y gráficos
+numpy>=1.26.0        # Operaciones numéricas (usado por osmnx)
+shapely>=2.0.0       # Geometría (dependencia de osmnx)
