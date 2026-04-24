@@ -146,3 +146,89 @@ Recorren **todos** los puntos sin ninguna poda — O(n) siempre. Los uso como re
 | Vecino más cercano  | O(log n) prom. |
 | Fuerza bruta        | O(n) siempre  |
 <img width="1440" height="2840" alt="image" src="https://github.com/user-attachments/assets/8d80445e-91de-4acf-8d4e-58eb016c4c6b" />
+
+## ⚡ Análisis comparativo — Quadtree vs Fuerza Bruta
+
+![Análisis de rendimiento](image.png)
+
+Para este análisis quería responder una pregunta concreta: **¿a partir de cuántos
+puntos el Quadtree realmente vale la pena frente a simplemente recorrer la lista?**
+Lo que hice fue medir el tiempo promedio de 15 consultas aleatorias con radio de
+500 m para distintos tamaños de datos (desde 100 hasta 100.000 puntos) y compararlo
+con la fuerza bruta.
+
+---
+
+### Gráfico 1 — Range Search (radio 500 m)
+
+Este gráfico muestra lo más importante del ejercicio. La línea roja es la fuerza
+bruta y la amarilla es el Quadtree. La escala es logarítmica en ambos ejes porque
+los valores varían mucho entre n=100 y n=100.000.
+
+Lo que se puede ver claramente es que la fuerza bruta crece de forma casi perfectamente
+lineal (como se esperaba siendo O(n)), mientras que el Quadtree se mantiene casi
+constante. A n=100.000 la fuerza bruta tardó ~13.5 ms por consulta y el Quadtree
+solo ~0.24 ms — es decir, **el Quadtree fue ~57 veces más rápido**.
+
+La línea morada punteada muestra el tiempo de construcción del árbol, que es más
+alto que una consulta individual pero se paga una sola vez. Esto tiene sentido para
+datos estáticos como en este ejercicio: se construye el árbol al inicio y luego se
+hacen miles de consultas baratas.
+
+| n | Fuerza Bruta | Quadtree | Speedup |
+|---|---|---|---|
+| 100 | 0.013 ms | 0.011 ms | 1.2× |
+| 500 | 0.058 ms | 0.019 ms | 3.1× |
+| 1.000 | 0.125 ms | 0.020 ms | 6.2× |
+| 5.000 | 0.600 ms | 0.040 ms | 15.1× |
+| 10.000 | 1.528 ms | 0.053 ms | 29.0× |
+| 50.000 | 7.232 ms | 0.120 ms | 60.4× |
+| 100.000 | 13.551 ms | 0.237 ms | 57.3× |
+
+**¿Por qué el Quadtree es tan rápido con radio pequeño?** Porque cuando el círculo
+de búsqueda (500 m) es pequeño relativo al espacio total (~20 km × 20 km), la función
+`_circulo_intersecta_caja()` descarta los cuatro hijos de la mayoría de los nodos sin
+siquiera revisar sus puntos. El árbol poda ramas enteras del espacio de golpe.
+
+---
+
+### Gráfico 2 — Vecino más cercano
+
+Para la búsqueda del vecino más cercano el comportamiento es similar: el Quadtree
+gana desde tamaños pequeños. La diferencia es que aquí la poda es aún más agresiva
+porque a medida que encontramos candidatos más cercanos, la distancia mínima que
+necesitamos mejorar se vuelve más pequeña, lo que permite descartar más subárboles.
+
+---
+
+### Gráfico 3 — Peor caso
+
+Este gráfico fue el más interesante para mí porque muestra algo contra-intuitivo:
+**con radio infinito, la fuerza bruta es más rápida que el Quadtree**.
+
+¿Por qué? Porque con un radio que cubre todo el espacio, el Quadtree no puede podar
+ningún nodo — tiene que visitar todos los nodos internos (con 4 hijos cada uno) y
+revisar todos los puntos en cada hoja. Eso es O(n) igual que la fuerza bruta, pero
+con el overhead de la recursión sobre la estructura del árbol.
+
+La fuerza bruta en cambio es O(n) puro: un solo bucle sin overhead de ningún tipo.
+Esto me hizo entender que el Quadtree no es mejor en todos los casos, sino que su
+ventaja depende de que el radio sea **pequeño relativo al espacio total**.
+
+---
+
+### ¿A partir de qué n gana el Quadtree?
+
+Empíricamente, con radio 500 m sobre un espacio de 20 km × 20 km, el Quadtree
+empieza a ser más rápido prácticamente desde el inicio (~100-200 puntos). Esto se
+debe a que la poda geométrica es muy efectiva para radios pequeños: incluso con
+pocos puntos, la mayoría del espacio queda fuera del radio y el árbol lo descarta.
+
+La ventaja **crece con n** porque la fuerza bruta siempre revisa los n puntos sin
+importar nada, mientras que el Quadtree revisa un número casi constante de nodos
+para radios pequeños (gracias a la poda).
+
+> **Conclusión personal:** Implementar el Quadtree desde cero me ayudó a entender
+> por qué las estructuras de datos espaciales existen. Con 10.000 puntos y haciendo
+> 1.000 consultas por día, la fuerza bruta tomaría ~15 segundos en total mientras
+> que el Quadtree tomaría ~0.05 segundos. La diferencia se vuelve enorme a escala real.
