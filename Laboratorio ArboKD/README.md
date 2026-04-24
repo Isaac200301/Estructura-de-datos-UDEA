@@ -276,7 +276,6 @@ python analisis.py
 
 ## 📚 Referencia
 
-- Bentley, J. L. (1975). *Multidimensional binary search trees used for associative searching*. Communications of the ACM, 18(9), 509–517.
 - OpenStreetMap contributors (2024). Datos cartográficos de Medellín, Colombia.
 - Apoyo de Claude para la generacion de mapas y tests
   
