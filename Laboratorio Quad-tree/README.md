@@ -149,7 +149,7 @@ Recorren **todos** los puntos sin ninguna poda — O(n) siempre. Los uso como re
 
 ## ⚡ Análisis comparativo — Quadtree vs Fuerza Bruta
 
-![Análisis de rendimiento](image.png)
+![Análisis de rendimiento](analisis_rendimiento.png)
 
 Para este análisis quería responder una pregunta concreta: **¿a partir de cuántos
 puntos el Quadtree realmente vale la pena frente a simplemente recorrer la lista?**
