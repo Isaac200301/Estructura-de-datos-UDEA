@@ -6,28 +6,33 @@
 
 ---
 
-##  Objetivo de la práctica
+## Objetivo de la práctica
 
-Implementar desde cero un **Quadtree** para resolver de forma eficiente dos tipos de consultas espaciales sobre 10.000 puntos de entrega:
+Implementar desde cero un **Quadtree** para resolver de forma eficiente dos tipos de consultas espaciales sobre 10.000 puntos de entrega reales:
 
 1. **Búsqueda por radio:** ¿Qué puntos están dentro de 500 metros de una ubicación?
-2. **Vecino más cercano:** ¿Cuál es el punto más próximo?
+2. **Vecino más cercano:** ¿Cuál es el punto más próximo a una ubicación dada?
 
 El proyecto compara el Quadtree contra la **fuerza bruta** para:
 
-- Medir tiempos reales de ejecución  
-- Identificar el **umbral** donde el Quadtree empieza a ser mejor  
+- Medir tiempos reales de ejecución
+- Identificar el **umbral** donde el Quadtree empieza a ser más rápido
 - Analizar el comportamiento en el **peor caso**
+
+> **Restricción:** No se usaron librerías de árboles externas. Todo fue implementado a mano.
 
 ---
 
-##  ¿Qué es un Quadtree?
+## ¿Qué es un Quadtree?
 
-Un Quadtree es una estructura de datos en forma de árbol que se utiliza en informática para representar de forma eficiente un área espacial bidimensional. Imagina un cuadrado que representa una sección de un mapa. En un Quadtree, este cuadrado se divide en cuatro cuadrados más pequeños e iguales (o «cuadrantes»). Cada uno de estos cuadrantes se puede subdividir a su vez en cuatro cuadrados más pequeños, y así sucesivamente. Esta división jerárquica permite realizar consultas espaciales eficientes, como encontrar todos los puntos dentro de un área determinada.
+Un Quadtree es una estructura de datos en forma de árbol que representa de forma eficiente un área espacial bidimensional. Imagina un cuadrado que representa una sección de un mapa: en un Quadtree, ese cuadrado se divide en cuatro cuadrados más pequeños e iguales (cuadrantes). Cada uno de esos cuadrantes puede subdividirse a su vez en cuatro más, y así sucesivamente.
+
+Esta división jerárquica permite realizar consultas espaciales eficientes como encontrar todos los puntos dentro de un área determinada.
 
 A diferencia del KD-Tree:
 - No divide por ejes alternados
 - Divide el espacio **geométricamente en 4 partes iguales**
+- Funciona especialmente bien cuando los datos están distribuidos de forma relativamente uniforme
 
 ---
 
@@ -36,144 +41,249 @@ A diferencia del KD-Tree:
 El Quadtree funciona así:
 
 1. Empiezas con todo el espacio (un gran cuadrado)
-2. Si hay muchos puntos en una zona:
-   → se divide en 4 cuadrantes
+2. Si hay muchos puntos en una zona → se divide en 4 cuadrantes
 3. Cada cuadrante puede dividirse otra vez si se llena
 
 ---
+
+## Estructura del repositorio
+
+```
+Laboratorio Quad-tree/
+├── Quadtree.py      <- Implementación del árbol desde cero
+├── test.py          <- Pruebas y visualizaciones
+├── analisis.py      <- Benchmark y comparación con fuerza bruta
+├── requirements.txt <- Dependencias
+├── README.md
+└── image/
+    └── analisis_rendimiento.png
+```
+
+---
+
 ## Cómo construí el Quadtree
 
-### 1 · `NodoCuad` — la unidad básica
-
-Cada nodo guarda los límites de su rectángulo (`xmin`, `xmax`, `ymin`, `ymax`), una lista de puntos (solo en hojas) y cuatro hijos: `nw`, `ne`, `sw`, `se`. El flag `dividido` indica si ya fue subdividido. La profundidad máxima (`max_prof = 25`) evita recursión infinita cuando hay puntos muy juntos.
-
----
-
-### 2 · `construir_quadtree(lista_puntos)`
-
-Construyo el árbol insertando los puntos de a uno:
-
-1. **Bounding box automático** — calculo `min/max` de x e y y agrego un margen de 1 px para evitar problemas en los bordes exactos.
-2. **Creo la raíz** con ese bounding box.
-3. **Llamo `_insertar`** por cada punto.
-
-> **Diferencia clave con el KD-Tree:** el KD-Tree parte el espacio por la mediana (top-down); el Quadtree parte por el centro geométrico al momento en que un nodo se llena (bottom-up).
-
-Complejidad: **O(n log n)** promedio, **O(n)** de espacio.
-
----
-
-### 3 · `_insertar(nodo, punto)` — árbol de decisiones
-
-```
-¿El punto está fuera del bbox?  →  return False
-¿El nodo es hoja y tiene espacio (o llegó a max_prof)?  →  append + return True
-¿El nodo es hoja pero está lleno?  →  _subdividir() + reintentar
-¿El nodo ya está dividido?  →  delegar al hijo correcto
-```
-
----
-
-### 4 · `_subdividir(nodo)`
-
-Calculo el punto de corte central:
+### 1 · `Nodo` — la unidad básica
 
 ```python
-cx = (xmin + xmax) / 2
-cy = (ymin + ymax) / 2
+class Nodo:
+    def __init__(self, xmin, xmax, ymin, ymax, capacidad=CAPACIDAD, nivel=0):
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ymin = ymin
+        self.ymax = ymax
+        self.capacidad = capacidad
+        self.nivel = nivel
+        self.puntos = []
+        self.nw = None
+        self.ne = None
+        self.sw = None
+        self.se = None
+        self.dividido = False
 ```
 
-Creo cuatro hijos que cubren los cuadrantes del plano:
-
-| Hijo | Rango x    | Rango y    |
-|------|-----------|-----------|
-| NW   | xmin → cx | cy → ymax |
-| NE   | cx → xmax | cy → ymax |
-| SW   | xmin → cx | ymin → cy |
-| SE   | cx → xmax | ymin → cy |
-
-Luego redistribuyo los puntos viejos del nodo llamando `_insertar` en cada hijo.
+Cada nodo guarda los límites de su rectángulo (`xmin`, `xmax`, `ymin`, `ymax`), una lista de puntos (solo en nodos hoja) y cuatro hijos: `nw`, `ne`, `sw`, `se`. El flag `dividido` indica si ya fue subdividido.
 
 ---
 
-### 5 · Helpers de poda geométrica
+### 2 · `construir_quadtree(puntos)`
 
-Dos funciones que hacen posible la eficiencia:
+Construyo el árbol insertando los puntos uno a uno:
 
-- **`_circulo_intersecta_caja`** — encuentra el punto del rectángulo más cercano al centro del círculo de búsqueda y verifica si cae dentro del radio. Si no hay intersección, descarta todo el subárbol sin revisar ningún punto.
-- **`_dist_minima_caja`** — distancia mínima de un punto al rectángulo (0 si está dentro). Se usa para podar ramas en la búsqueda de vecino más cercano.
+1. Calculo el **bounding box** automáticamente con `min/max` de x e y, y agrego un margen de 1 unidad para evitar problemas en los bordes exactos.
+2. Creo la raíz con ese bounding box.
+3. Llamo a `insertar` por cada punto.
 
-Ambas operan solo con sumas de cuadrados para evitar `sqrt` innecesarios.
+```python
+def construir_quadtree(puntos):
+    if not puntos:
+        return None
+    xs = [p[0] for p in puntos]
+    ys = [p[1] for p in puntos]
+    raiz = Nodo(min(xs)-1, max(xs)+1, min(ys)-1, max(ys)+1)
+    for p in puntos:
+        insertar(raiz, p)
+    return raiz
+```
+
+> **Diferencia clave con el KD-Tree:** el KD-Tree parte por la mediana (top-down); el Quadtree parte por el centro geométrico cuando un nodo se llena (bottom-up).
 
 ---
 
-### 6 · `busqueda_radio(nodo, objetivo, radio)`
+### 3 · `subdividir(nodo)`
 
-Búsqueda por rango circular con poda geométrica:
+Calculo el punto central del rectángulo y creo cuatro hijos:
 
-1. Si el círculo **no** intersecta el bbox del nodo → saltar todo el subárbol.
-2. Si el nodo es hoja → revisar cada punto con distancia euclidiana.
-3. Si el nodo está dividido → recurrir en los cuatro hijos.
+```python
+cx = (nodo.xmin + nodo.xmax) / 2
+cy = (nodo.ymin + nodo.ymax) / 2
+```
+
+| Hijo | Rango X        | Rango Y        |
+|------|----------------|----------------|
+| NW   | xmin → cx      | cy → ymax      |
+| NE   | cx → xmax      | cy → ymax      |
+| SW   | xmin → cx      | ymin → cy      |
+| SE   | cx → xmax      | ymin → cy      |
+
+Luego redistribuyo los puntos viejos del nodo llamando `insertar` en cada hijo.
+
+---
+
+### 4 · `insertar(nodo, punto)`
+
+```
+¿El punto está fuera del bbox?        →  return False
+¿El nodo es hoja y tiene espacio?     →  guardar aquí y return True
+¿El nodo es hoja pero está lleno?     →  subdividir() + reintentar
+¿El nodo ya está dividido?            →  probar los 4 hijos en orden
+```
+
+---
+
+### 5 · `intersecta(cx, cy, r, ...)` — poda geométrica
+
+Verifica si un círculo de búsqueda toca el rectángulo del nodo. Si no hay intersección, descarta todo el subárbol sin revisar ningún punto.
+
+```python
+def intersecta(cx, cy, r, xmin, xmax, ymin, ymax):
+    px = max(xmin, min(cx, xmax))
+    py = max(ymin, min(cy, ymax))
+    dx = cx - px
+    dy = cy - py
+    return dx*dx + dy*dy <= r*r
+```
+
+Esta función es la razón por la que el Quadtree es eficiente: si el círculo de 500 m no toca un cuadrante, se descartan todos los puntos de ese cuadrante de golpe.
+
+---
+
+### 6 · `buscar_radio(nodo, punto, radio)`
+
+```python
+def buscar_radio(nodo, punto, radio, resultado=None):
+    if not intersecta(...):   # PODA: si no hay intersección, saltar
+        return resultado
+    for p in nodo.puntos:     # revisar puntos del nodo actual
+        if distancia(p, punto) <= radio:
+            resultado.append(p)
+    if nodo.dividido:         # recurrir en los 4 hijos
+        buscar_radio(nodo.nw, ...)
+        buscar_radio(nodo.ne, ...)
+        buscar_radio(nodo.sw, ...)
+        buscar_radio(nodo.se, ...)
+    return resultado
+```
 
 Complejidad: **O(log n + k)** donde k = puntos encontrados.
 
 ---
 
-### 7 · `vecino_cercano(nodo, objetivo, mejor)`
+### 7 · `vecino_mas_cercano(nodo, punto, mejor)`
 
-Nearest-neighbor con poda por distancia mínima al bbox:
+Recorre el árbol actualizando el mejor candidato encontrado hasta el momento:
 
-1. Si `dist_minima_caja ≥ mejor actual` → podar toda la rama.
-2. Revisar puntos del nodo y actualizar el mejor.
-3. **Visitar primero el cuadrante donde cae el objetivo** (es el más prometedor y mejora la poda de los demás cuadrantes).
-4. Visitar los otros tres hijos en orden de cercanía.
+```python
+def vecino_mas_cercano(nodo, punto, mejor=None):
+    for p in nodo.puntos:
+        d = distancia(p, punto)
+        if mejor is None or d < mejor[1]:
+            mejor = (p, d)
+    if nodo.dividido:
+        mejor = vecino_mas_cercano(nodo.nw, punto, mejor)
+        mejor = vecino_mas_cercano(nodo.ne, punto, mejor)
+        mejor = vecino_mas_cercano(nodo.sw, punto, mejor)
+        mejor = vecino_mas_cercano(nodo.se, punto, mejor)
+    return mejor
+```
 
 ---
 
-### 8 · `busqueda_fuerza_bruta` / `vecino_bruta`
+### 8 · `buscar_bruta` / `vecino_bruta`
 
-Recorren **todos** los puntos sin ninguna poda — O(n) siempre. Los uso como referencia para verificar que el árbol devuelve exactamente los mismos resultados que la búsqueda exhaustiva.
+Recorren **todos** los puntos sin ninguna optimización — O(n) siempre. Los uso para verificar que el árbol devuelve exactamente los mismos resultados.
 
 ---
 
 ### Resumen de complejidades
 
-| Operación           | Complejidad    |
-|---------------------|---------------|
-| Construcción        | O(n log n) prom. |
-| Espacio             | O(n)          |
-| Búsqueda por radio  | O(log n + k)  |
-| Vecino más cercano  | O(log n) prom. |
-| Fuerza bruta        | O(n) siempre  |
-<img width="1440" height="2840" alt="image" src="https://github.com/user-attachments/assets/8d80445e-91de-4acf-8d4e-58eb016c4c6b" />
-
-## ⚡ Análisis comparativo — Quadtree vs Fuerza Bruta
-
-![Análisis de rendimiento](analisis_rendimiento.png)
-
-Para este análisis quería responder una pregunta concreta: **¿a partir de cuántos
-puntos el Quadtree realmente vale la pena frente a simplemente recorrer la lista?**
-Lo que hice fue medir el tiempo promedio de 15 consultas aleatorias con radio de
-500 m para distintos tamaños de datos (desde 100 hasta 100.000 puntos) y compararlo
-con la fuerza bruta.
+| Operación           | Fuerza Bruta | Quadtree          |
+|---------------------|--------------|-------------------|
+| Construcción        | —            | O(n log n) prom.  |
+| Espacio             | O(n)         | O(n)              |
+| Búsqueda por radio  | O(n)         | O(log n + k)      |
+| Vecino más cercano  | O(n)         | O(log n) prom.    |
 
 ---
 
-### Gráfico 1 — Range Search (radio 500 m)
+## Pruebas (`test.py`)
 
-Este gráfico muestra lo más importante del ejercicio. La línea roja es la fuerza
-bruta y la amarilla es el Quadtree. La escala es logarítmica en ambos ejes porque
-los valores varían mucho entre n=100 y n=100.000.
+### Datos reales
 
-Lo que se puede ver claramente es que la fuerza bruta crece de forma casi perfectamente
-lineal (como se esperaba siendo O(n)), mientras que el Quadtree se mantiene casi
-constante. A n=100.000 la fuerza bruta tardó ~13.5 ms por consulta y el Quadtree
-solo ~0.24 ms — es decir, **el Quadtree fue ~57 veces más rápido**.
+Los puntos de entrega se obtienen de **OpenStreetMap** vía `osmnx`: centroides de edificios de Medellín, proyectados al sistema métrico colombiano **EPSG:3116**.
 
-La línea morada punteada muestra el tiempo de construcción del árbol, que es más
-alto que una consulta individual pero se paga una sola vez. Esto tiene sentido para
-datos estáticos como en este ejercicio: se construye el árbol al inicio y luego se
-hacen miles de consultas baratas.
+```
+EPSG:4326 (lat/lon en grados)  →  EPSG:3116 (metros, Colombia)
+```
+
+### Verificaciones de correctitud
+
+```python
+# Distancia euclidiana
+assert distancia((0, 0), (3, 4)) == 5.0
+
+# KD-Tree == fuerza bruta en radio search
+res1 = set(buscar_radio(qt, p, RADIO))
+res2 = set(buscar_bruta(muestra, p, RADIO))
+assert res1 == res2
+
+# Mismo vecino más cercano
+_, d1 = vecino_mas_cercano(qt, p)
+_, d2 = vecino_bruta(muestra, p)
+assert abs(d1 - d2) < 1e-6
+```
+
+### 5 puntos de consulta — radio fijo 500 m
+
+| Zona | Descripción |
+|------|-------------|
+| Centro | Centroide de todos los puntos |
+| NW | Zona norte-oeste |
+| NE | Zona norte-este |
+| SW | Zona sur-oeste |
+| SE | Zona sur-este |
+
+---
+
+## Visualizaciones
+
+### Vista global — Quadtree + 5 consultas
+
+La visualización característica del Quadtree son los **rectángulos anidados**: donde hay más puntos el árbol subdivide más, generando cuadrantes pequeños. Donde hay pocos puntos los cuadrantes son grandes. Esto se diferencia claramente del KD-Tree, que muestra líneas que se extienden.
+
+### Zoom por punto de consulta
+
+En el zoom se ven los rectángulos de subdivisión dentro del radio de búsqueda, las conexiones de cada vecino al punto central, y la línea al vecino más cercano.
+
+---
+
+## ⚡ Análisis comparativo — Quadtree vs Fuerza Bruta
+
+![Análisis de rendimiento](image/analisis_rendimiento.png)
+
+Para este análisis quería responder una pregunta concreta: **¿a partir de cuántos puntos el Quadtree realmente vale la pena frente a simplemente recorrer la lista?**
+
+Lo que hice fue medir el tiempo promedio de 10 consultas aleatorias con radio de 500 m para distintos tamaños de datos (desde 100 hasta 10.000 puntos) y compararlo con la fuerza bruta.
+
+---
+
+### Gráfico 1 — Búsqueda por radio (500 m)
+
+Este gráfico muestra lo más importante del ejercicio. La línea gris es la fuerza bruta y la azul es el Quadtree.
+
+Se puede ver claramente que la fuerza bruta crece de forma casi perfectamente lineal (como se esperaba siendo O(n)), mientras que el Quadtree se mantiene casi constante. A n=10.000 la fuerza bruta tardó ~1.5 ms por consulta y el Quadtree solo ~0.05 ms — es decir, **el Quadtree fue ~29 veces más rápido**.
+
+La línea gris punteada muestra el tiempo de construcción del árbol, que se paga una sola vez. Esto tiene sentido para datos estáticos como en este ejercicio: se construye el árbol al inicio y luego se hacen miles de consultas baratas.
 
 | n | Fuerza Bruta | Quadtree | Speedup |
 |---|---|---|---|
@@ -182,53 +292,54 @@ hacen miles de consultas baratas.
 | 1.000 | 0.125 ms | 0.020 ms | 6.2× |
 | 5.000 | 0.600 ms | 0.040 ms | 15.1× |
 | 10.000 | 1.528 ms | 0.053 ms | 29.0× |
-| 50.000 | 7.232 ms | 0.120 ms | 60.4× |
-| 100.000 | 13.551 ms | 0.237 ms | 57.3× |
 
-**¿Por qué el Quadtree es tan rápido con radio pequeño?** Porque cuando el círculo
-de búsqueda (500 m) es pequeño relativo al espacio total (~20 km × 20 km), la función
-`_circulo_intersecta_caja()` descarta los cuatro hijos de la mayoría de los nodos sin
-siquiera revisar sus puntos. El árbol poda ramas enteras del espacio de golpe.
+**¿Por qué el Quadtree es tan rápido con radio pequeño?** Porque cuando el círculo de búsqueda (500 m) es pequeño relativo al espacio total (~20 km × 20 km), la función `intersecta()` descarta los cuatro hijos de la mayoría de los nodos sin siquiera revisar sus puntos. El árbol poda ramas enteras del espacio de golpe.
 
 ---
 
 ### Gráfico 2 — Vecino más cercano
 
-Para la búsqueda del vecino más cercano el comportamiento es similar: el Quadtree
-gana desde tamaños pequeños. La diferencia es que aquí la poda es aún más agresiva
-porque a medida que encontramos candidatos más cercanos, la distancia mínima que
-necesitamos mejorar se vuelve más pequeña, lo que permite descartar más subárboles.
+Para la búsqueda del vecino más cercano el comportamiento es similar: el Quadtree gana desde tamaños relativamente pequeños. Aquí la función recorre el árbol actualizando el mejor candidato, pero sin la poda por distancia mínima al bbox que tendría una implementación más avanzada. Aun así, la estructura jerárquica ayuda a llegar rápido a las zonas más prometedoras.
 
 ---
 
 ### Gráfico 3 — Peor caso
 
-Este gráfico fue el más interesante para mí porque muestra algo contra-intuitivo:
-**con radio infinito, la fuerza bruta es más rápida que el Quadtree**.
+Este fue el gráfico más interesante porque muestra algo contra-intuitivo: **con radio infinito, la fuerza bruta puede ser más rápida que el Quadtree**.
 
-¿Por qué? Porque con un radio que cubre todo el espacio, el Quadtree no puede podar
-ningún nodo — tiene que visitar todos los nodos internos (con 4 hijos cada uno) y
-revisar todos los puntos en cada hoja. Eso es O(n) igual que la fuerza bruta, pero
-con el overhead de la recursión sobre la estructura del árbol.
+¿Por qué? Porque con un radio que cubre todo el espacio, el Quadtree no puede podar ningún nodo — tiene que visitar todos los nodos internos (con 4 hijos cada uno) y revisar todos los puntos en cada hoja. Eso es O(n) igual que la fuerza bruta, pero con el overhead de la recursión sobre la estructura del árbol.
 
-La fuerza bruta en cambio es O(n) puro: un solo bucle sin overhead de ningún tipo.
-Esto me hizo entender que el Quadtree no es mejor en todos los casos, sino que su
-ventaja depende de que el radio sea **pequeño relativo al espacio total**.
+La fuerza bruta en cambio es O(n) puro: un solo bucle sin overhead de ningún tipo. Esto me hizo entender que el Quadtree no es mejor en todos los casos — su ventaja depende de que el radio sea **pequeño relativo al espacio total**.
 
 ---
 
 ### ¿A partir de qué n gana el Quadtree?
 
-Empíricamente, con radio 500 m sobre un espacio de 20 km × 20 km, el Quadtree
-empieza a ser más rápido prácticamente desde el inicio (~100-200 puntos). Esto se
-debe a que la poda geométrica es muy efectiva para radios pequeños: incluso con
-pocos puntos, la mayoría del espacio queda fuera del radio y el árbol lo descarta.
+Empíricamente, con radio 500 m sobre un espacio de 20 km × 20 km, el Quadtree empieza a ser más rápido a partir de unos **200–500 puntos**. Esto se debe a que la poda geométrica es muy efectiva para radios pequeños: incluso con pocos puntos, la mayoría del espacio queda fuera del radio y el árbol lo descarta.
 
-La ventaja **crece con n** porque la fuerza bruta siempre revisa los n puntos sin
-importar nada, mientras que el Quadtree revisa un número casi constante de nodos
-para radios pequeños (gracias a la poda).
+La ventaja **crece con n** porque la fuerza bruta siempre revisa los n puntos sin importar nada, mientras que el Quadtree revisa un número casi constante de nodos para radios pequeños.
 
-> **Conclusión personal:** Implementar el Quadtree desde cero me ayudó a entender
-> por qué las estructuras de datos espaciales existen. Con 10.000 puntos y haciendo
-> 1.000 consultas por día, la fuerza bruta tomaría ~15 segundos en total mientras
-> que el Quadtree tomaría ~0.05 segundos. La diferencia se vuelve enorme a escala real.
+> **Conclusión:** Implementar el Quadtree desde cero me ayudó a entender por qué las estructuras de datos espaciales existen. Con 10.000 puntos y muchas consultas por día, la diferencia de 29× se vuelve enorme a escala real. Además, la visualización de rectángulos anidados me pareció muy intuitiva para entender cómo el árbol organiza el espacio según la densidad de puntos.
+
+---
+
+## Instalación
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+# Pruebas y visualizaciones
+python test.py
+
+# Análisis de rendimiento
+python analisis.py
+```
+
+---
+
+## Referencia
+
+- Claude para la comstruccion de las graficas y los mapas
+- OpenStreetMap contributors (2024). Datos cartográficos de Medellín, Colombia.
